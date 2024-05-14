@@ -187,11 +187,3 @@
     /* outer SD */ hsla(210, 50%, 40%, 0) 0 -5px 6px 4px,
     /* outer SD */ hsla(210, 80%, 95%, 0) 0 5px 6px 4px; /* outer HL */
 }
-
-.elevator-container {
-  width: 200px;
-  height: 200px;
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-}

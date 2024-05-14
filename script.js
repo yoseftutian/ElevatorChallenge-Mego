@@ -1,123 +1,98 @@
-const building = document.getElementById("building");
-const numFloors = 5;
-const elevators = [];
-const floorHeight = 117; // גובה קומה בפיקסלים
+// הגדרת מספר הקומות והמעליות
+const numFloors = 10;
+const numElevators = 2;
 
-// Create floors
-for (let i = numFloors - 1; i >= 0; i--) {
-  const floor = document.createElement("div");
-  floor.classList.add("floor");
+// יצירת אובייקטים למעליות
+const elevators = Array.from({ length: numElevators }, () => ({
+  currentFloor: 1,
+  targetFloor: null,
+  isMoving: false,
+}));
 
-  const floorNumber = document.createElement("span");
-  floorNumber.classList.add("floor-number");
-  floorNumber.textContent = i;
-  floor.appendChild(floorNumber);
+// יצירת אלמנטי HTML לבניין
+const buildingDiv = document.getElementById('building');
 
-  const callButton = document.createElement("button");
-  callButton.classList.add("call-button", "metal", "linear");
-  callButton.textContent = "Call Elevator";
-  callButton.addEventListener("click", () => callElevator(i));
-  floor.appendChild(callButton);
+// יצירת קומות ופקדים
+for (let i = numFloors; i >= 1; i--) {
+  const floor = document.createElement('div');
+  floor.classList.add('floor');
+  floor.style.height = '110px';
 
-  building.appendChild(floor);
+  const button = document.createElement('button');
+  button.classList.add('metal', 'linear');
+  button.textContent = `Floor ${i}`;
+  button.addEventListener('click', () => callElevator(i));
+  floor.appendChild(button);
+
+  buildingDiv.appendChild(floor);
 }
 
-// Create elevators
-for (let i = 0; i < 2; i++) {
-  const elevator = document.createElement("div");
-  elevator.classList.add("elevator", "elevator-container"); // הוספת הקלאס "elevator-container"
-  elevator.style.backgroundImage = "url('elv.png')";
-  elevator.style.transform = `translateY(${(numFloors - 1) * floorHeight}px)`;
-  building.appendChild(elevator);
-  elevators.push({
-    element: elevator,
-    currentFloor: numFloors - 1,
-    queue: [],
-  });
+// יצירת מעליות
+for (let i = 0; i < numElevators; i++) {
+  const elevator = document.createElement('img');
+  elevator.src = 'elv.png';
+  elevator.classList.add('elevator');
+  elevator.style.bottom = '0';
+  buildingDiv.appendChild(elevator);
 }
 
-// Call elevator function
+// פונקציה לקריאת מעלית
 function callElevator(floor) {
-  const callButton = building.querySelectorAll(".call-button")[floor];
-  callButton.classList.add("active");
+  const availableElevator = elevators.find(
+    (elevator) => !elevator.isMoving && elevator.targetFloor === null
+  );
 
-  const closestElevator = elevators.reduce((prevElevator, currentElevator) => {
-    const prevDistance = Math.abs((prevElevator.currentFloor - floor) * floorHeight);
-    const currentDistance = Math.abs((currentElevator.currentFloor - floor) * floorHeight);
-    return prevDistance <= currentDistance ? prevElevator : currentElevator;
-  }, elevators[0]);
-
-  closestElevator.queue.push(floor);
-
-  if (!closestElevator.isMoving) {
-    processElevatorQueue(closestElevator);
+  if (availableElevator) {
+    availableElevator.targetFloor = floor;
+    moveElevator(availableElevator);
+  } else {
+    const buttons = document.querySelectorAll(`.floor:nth-child(${numFloors - floor + 1}) button`);
+    buttons.forEach((button) => {
+      button.style.color = 'green';
+      let countdown = 10; // זמן המתנה לדוגמה
+      const interval = setInterval(() => {
+        button.textContent = `Floor ${floor} (${countdown})`;
+        countdown--;
+        if (countdown === 0) {
+          clearInterval(interval);
+          button.style.color = '';
+          button.textContent = `Floor ${floor}`;
+          callElevator(floor); // הזמנת מעלית שוב אם אין פנויה
+        }
+      }, 1000);
+    });
   }
 }
 
-// Process elevator queue
-function processElevatorQueue(elevator) {
+// פונקציה לתזוז מעלית
+function moveElevator(elevator) {
   elevator.isMoving = true;
-  const queue = elevator.queue;
-  const destinationFloor = queue.shift();
-  const distance = Math.abs(elevator.currentFloor - destinationFloor) * floorHeight;
-  const duration = distance * 0.5; // 0.5 pixels per millisecond
+  const elevatorImg = document.querySelectorAll('.elevator')[elevators.indexOf(elevator)];
+  const targetFloor = elevator.targetFloor;
+  const distance = Math.abs(elevator.currentFloor - targetFloor);
+  const duration = distance * 500; // 500ms לכל קומה
 
-  moveElevator(elevator.element, destinationFloor, duration)
-    .then(() => {
-      elevator.currentFloor = destinationFloor;
-      const callButton = building.querySelectorAll(".call-button")[destinationFloor];
-      callButton.classList.remove("active");
-      playDingSound();
-      return new Promise((resolve) => setTimeout(resolve, 2000));
-    })
-    .then(() => {
-      if (queue.length > 0) {
-        processElevatorQueue(elevator);
-      } else {
-        elevator.isMoving = false;
-      }
-    });
-}
+  let currentTime = 0;
+  const interval = setInterval(() => {
+    currentTime += 50; // עדכון מיקום כל 50ms
+    const progress = currentTime / duration;
+    const currentFloor =
+      elevator.currentFloor < targetFloor
+        ? elevator.currentFloor + Math.floor(progress * distance)
+        : elevator.currentFloor - Math.floor(progress * distance);
 
-// Move elevator animation
-function moveElevator(elevatorElement, destinationFloor, duration) {
-  return new Promise((resolve) => {
-    const startPosition = elevatorElement.offsetTop;
-    const endPosition = (numFloors - destinationFloor - 1) * floorHeight;
-    let startTime = null;
+    elevatorImg.style.bottom = `${(currentFloor - 1) * 117}px`; // עדכון מיקום המעלית
 
-    function animate(currentTime) {
-      if (!startTime) {
-        startTime = currentTime;
-      }
-
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const interpolatedPosition = startPosition + (endPosition - startPosition) * easeInOutQuad(progress);
-
-      elevatorElement.style.transform = `translateY(${interpolatedPosition}px)`;
-
-      if (elapsed < duration) {
-        requestAnimationFrame(animate);
-      } else {
-        resolve();
-      }
+    if (currentTime >= duration) {
+      clearInterval(interval);
+      elevator.currentFloor = targetFloor;
+      elevator.targetFloor = null;
+      elevator.isMoving = false;
+      const audio = new Audio('ding.mp3');
+      audio.play();
+      setTimeout(() => {
+        callElevator(elevator.currentFloor); // קריאה למעלית הבאה
+      }, 2000);
     }
-
-    requestAnimationFrame(animate);
-  });
+  }, 50);
 }
-
-// Easing function for smooth animation
-function easeInOutQuad(t) {
-  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-}
-
-// Play ding sound
-function playDingSound() {
-  const audio = new Audio("ding.mp3");
-  audio.play();
-}
-
-const elevator = document.createElement("div");
-elevator.classList.add("elevator", "elevator-container");
